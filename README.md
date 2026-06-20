@@ -1,39 +1,46 @@
 # RAG Assistant
 
-A modular, offline-capable Retrieval-Augmented Generation (RAG) system designed for deployment in low-connectivity environments. Built with a backend-agnostic architecture that supports both cloud LLMs (OpenAI) and local open-source models (Llama 3 via Ollama).
+A modular Retrieval-Augmented Generation (RAG) system that answers questions grounded in FastAPI documentation. Designed with a backend-agnostic architecture that supports both cloud LLMs (OpenAI) and fully local, offline models (phi3:mini via Ollama) — swapping backends requires changing one environment variable.
 
-Agriculture knowledge management is the primary domain case study, with the broader goal of making AI-grounded document retrieval practical in resource-constrained settings.
+![FastAPI Docs Assistant UI](docs/screenshot.png)
 
 ---
 
-## Architecture Overview
+## What it does
+
+Ask a question about FastAPI. The system retrieves the most relevant chunks from the ingested documentation using vector similarity search, injects them as context into the LLM prompt, and returns a grounded answer with source attribution — no hallucination, every answer traceable to a specific document.
+
+---
+
+## Architecture
 
 ```
-Documents (PDF, TXT, DOCX)
-        │
-        ▼
-  [ Ingestion & Chunking ]     ← document_loader.py, chunker.py
-        │
-        ▼
-  [ Embedding ]                ← embedder.py  (OpenAI or local)
-        │
-        ▼
-  [ Vector Store ]             ← vector_store.py  (ChromaDB, local disk)
-        │
-        ▼  (at query time)
-  [ Retrieval ]                ← retriever.py
-        │
-        ▼
-  [ Prompt Construction ]      ← prompt_builder.py
-        │
-        ▼
-  [ LLM Generation ]           ← llm_client.py  ← ONLY file that knows which backend
-        │
-        ▼
-  [ Source-Attributed Answer ] ← returned to CLI or API layer
+data/raw/*.md
+      │
+      ▼
+document_loader.py    →   reads markdown files into Document objects
+      │
+      ▼
+chunker.py            →   boundary-aware splitting into overlapping chunks
+      │
+      ▼
+embedder.py           →   OpenAI text-embedding-3-small → ChromaDB (local disk)
+      │
+      ▼  (at query time)
+embedder.py           →   embeds the question, queries ChromaDB for top-K chunks
+      │
+      ▼
+llm_client.py         →   ONLY file that knows which LLM backend is active
+      │
+      ▼
+pipeline.py           →   { answer, sources, chunks }
+      │
+      ▼
+scripts/cli.py        →   interactive CLI
+app.py                →   Streamlit web UI
 ```
 
-**Key design decision:** `llm_client.py` is the only module that knows whether the system is using OpenAI or Ollama. Everything above it is backend-agnostic. Swapping models requires changing one environment variable.
+**Key design decision:** `llm_client.py` is the only module that knows whether the system is using OpenAI or Ollama. Everything else is backend-agnostic. Changing `LLM_BACKEND` in `.env` is the only change required to swap models.
 
 ---
 
@@ -42,23 +49,62 @@ Documents (PDF, TXT, DOCX)
 | Component | Choice | Why |
 |---|---|---|
 | Vector store | ChromaDB | Local disk persistence, no API key, offline-capable |
-| Embeddings | OpenAI `text-embedding-3-small` | High quality, low cost |
-| Generation (Phase 1) | OpenAI `gpt-4o-mini` | Fast, cheap, strong |
-| Generation (Phase 2) | Llama 3 via Ollama | Fully offline, zero API cost |
-| Chunking | LangChain `RecursiveCharacterTextSplitter` | Respects sentence/paragraph boundaries |
-| CLI | Python + Rich | Clean terminal output for demos |
+| Embeddings | OpenAI `text-embedding-3-small` | Multilingual, high quality, low cost |
+| Generation (default) | OpenAI `gpt-4o-mini` | Fast, cheap, strong instruction following |
+| Generation (local) | phi3:mini via Ollama | Fully offline, zero API cost, CPU-runnable |
+| Chunking | Boundary-aware (paragraph → sentence fallback) | Avoids cutting mid-sentence |
+| UI | Streamlit | Fast to ship, clean enough to demo |
 
 ---
 
-## Project Phases
+## Corpus
 
-| Phase | Scope | Status |
-|---|---|---|
-| **1** | Core RAG engine: ingest → embed → retrieve → answer (OpenAI backend, CLI) | 🔨 In progress |
-| **2** | Local model backend via Ollama + Llama 3. Benchmark vs OpenAI | ⏳ Planned |
-| **3** | Agriculture domain: curated corpus, domain eval, Sudan/low-connectivity framing | ⏳ Planned |
-| **4** | Web app shell: FastAPI backend + React frontend | ⏳ Planned |
-| **5** | Stretch: multilingual support, hybrid search, RAGAS evaluation | ⏳ Stretch |
+12 FastAPI official documentation files ingested from the FastAPI GitHub repository:
+
+`alternatives.md` · `async.md` · `benchmarks.md` · `editor-support.md` · `environment-variables.md` · `fastapi-cli.md` · `features.md` · `history-design-future.md` · `index.md` · `project-generation.md` · `python-types.md` · `virtual-environments.md`
+
+364 chunks total after boundary-aware splitting (CHUNK_SIZE=800, CHUNK_OVERLAP=150).
+
+---
+
+## Evaluation
+
+Evaluated on 15 question/reference-answer pairs using an **LLM-as-judge** methodology — GPT-4o-mini scores each generated answer 1–5 against the reference at temperature=0 for consistent scoring.
+
+| Backend | Avg Score | Median | Score ≥ 4 | Failures |
+|---|---|---|---|---|
+| OpenAI gpt-4o-mini | 4.27 / 5.00 | 4.0 | 13/15 (86%) | 1 |
+| Ollama phi3:mini | 4.53 / 5.00 | 5.0 | 15/15 (100%) | 0 |
+
+The local model achieved comparable answer quality to the cloud model while running fully offline with zero API cost, at the tradeoff of significantly higher latency on CPU-only hardware (~30–60s per response without a GPU).
+
+Known limitation: broad/vague queries (e.g. "What is FastAPI?") retrieve lower-quality chunks than specific technical questions, due to semantic mismatch between query phrasing and chunk content. Targeted technical questions score significantly higher.
+
+---
+
+## Project Structure
+
+```
+rag-assistant/
+├── rag/                      # Core library
+│   ├── config.py             # Central config loaded from .env
+│   ├── document_loader.py    # Markdown files → Document objects
+│   ├── chunker.py            # Documents → overlapping Chunk objects
+│   ├── embedder.py           # Chunks → embeddings → ChromaDB
+│   ├── llm_client.py         # LLM abstraction (OpenAI or Ollama)
+│   └── pipeline.py           # Wires components into ask()
+├── scripts/
+│   └── cli.py                # Interactive CLI
+├── evaluation/
+│   ├── eval_set.json         # 15 Q&A pairs
+│   └── evaluate.py           # LLM-as-judge evaluation script
+├── data/
+│   └── raw/                  # Source markdown files
+├── app.py                    # Streamlit web UI
+├── .env.example
+├── requirements.txt
+└── README.md
+```
 
 ---
 
@@ -66,58 +112,61 @@ Documents (PDF, TXT, DOCX)
 
 ```bash
 # 1. Clone and set up environment
-git clone <repo>
+git clone https://github.com/sharif-hassan/rag-assistant.git
 cd rag-assistant
 python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+
+# Windows:
+.venv\Scripts\activate
+# Mac/Linux:
+source .venv/bin/activate
+
 pip install -r requirements.txt
 
 # 2. Configure
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env and set OPENAI_API_KEY
 
-# 3. Ingest documents
-python -m scripts.ingest --source data/raw/
+# 3. Ingest documents into ChromaDB
+python -m rag.embedder
 
-# 4. Ask a question
-python -m scripts.query "What are the best practices for sesame cultivation?"
+# 4. Run the Streamlit UI
+streamlit run app.py
+
+# Or use the CLI
+python -m scripts.cli
 ```
 
----
+### Switching to local/offline mode
 
-## Repository Structure
+Install [Ollama](https://ollama.com/download), pull a model, then change one line in `.env`:
 
+```bash
+ollama pull phi3:mini
 ```
-rag-assistant/
-├── rag/                    # Core library — all RAG logic lives here
-│   ├── config.py           # Central config loaded from .env
-│   ├── document_loader.py  # PDF/TXT/DOCX → raw text
-│   ├── chunker.py          # Raw text → overlapping chunks
-│   ├── embedder.py         # Chunks → embedding vectors
-│   ├── vector_store.py     # ChromaDB read/write wrapper
-│   ├── retriever.py        # Query → top-K relevant chunks
-│   ├── prompt_builder.py   # Chunks + query → LLM prompt
-│   └── llm_client.py       # LLM abstraction (OpenAI or Ollama)
-├── scripts/
-│   ├── ingest.py           # CLI: load documents into vector store
-│   └── query.py            # CLI: ask questions against the index
-├── evaluation/
-│   └── eval_set.csv        # 10–15 Q&A pairs for Phase 1 evaluation
-├── tests/
-├── data/
-│   ├── raw/                # Source documents (gitignored)
-│   └── processed/          # Intermediate outputs if needed
-├── .env.example
-├── .gitignore
-├── requirements.txt
-└── README.md
+
+```env
+LLM_BACKEND=ollama
+OLLAMA_MODEL=phi3:mini
+```
+
+No other changes required.
+
+### Running evaluation
+
+```bash
+# OpenAI backend
+python -m evaluation.evaluate openai
+
+# Ollama backend
+python -m evaluation.evaluate ollama
 ```
 
 ---
 
 ## Design Principles
 
-1. **Backend-agnostic core** — model swapping happens in one file
-2. **Offline-first thinking** — ChromaDB needs no internet; Ollama (Phase 2) needs no API
-3. **Source attribution** — every answer includes which document chunks it came from
-4. **Incremental value** — each phase is independently deployable and resumé-worthy
+1. **Backend-agnostic core** — `llm_client.py` is the only file that knows which LLM is active
+2. **Offline-capable** — ChromaDB persists to local disk; Ollama runs with no internet or API key
+3. **Source attribution** — every answer includes which documents it was grounded in
+4. **Incremental architecture** — each phase (CLI → eval → UI → web app) is independently valuable
