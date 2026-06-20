@@ -1,0 +1,62 @@
+[
+  {
+    "question": "What is FastAPI?",
+    "reference": "FastAPI is a modern, fast web framework for building APIs with Python, based on standard Python type hints."
+  },
+  {
+    "question": "What are the main features of FastAPI?",
+    "reference": "FastAPI features automatic data validation, serialization, interactive documentation, high performance, and is based on open standards like OpenAPI and JSON Schema."
+  },
+  {
+    "question": "How does FastAPI use Python type hints?",
+    "reference": "FastAPI uses Python type hints to provide editor support, type checking, data validation, and automatic documentation generation."
+  },
+  {
+    "question": "What is the difference between async def and def in FastAPI path operations?",
+    "reference": "With async def, path operations run asynchronously and are non-blocking. With def, FastAPI runs them in an external threadpool and awaits them, which can block if performing blocking I/O."
+  },
+  {
+    "question": "How does FastAPI compare to Flask?",
+    "reference": "FastAPI provides automatic data validation, serialization, and documentation out of the box, whereas Flask is a microframework that requires manual implementation or additional tools for these features."
+  },
+  {
+    "question": "What is the FastAPI CLI and what can it do?",
+    "reference": "The FastAPI CLI is a command line tool included with FastAPI that can serve your app locally with auto-reload using fastapi dev, and deploy it to the cloud."
+  },
+  {
+    "question": "How fast is FastAPI compared to other Python frameworks?",
+    "reference": "FastAPI is one of the fastest Python frameworks available, ranking just below Starlette and Uvicorn in TechEmpower benchmarks, and faster than Flask, Django, and Sanic."
+  },
+  {
+    "question": "What editors work best with FastAPI?",
+    "reference": "FastAPI works best with VS Code and PyCharm, which have been specifically tested and cover the majority of Python developers."
+  },
+  {
+    "question": "What is Pydantic and how does FastAPI use it?",
+    "reference": "Pydantic is a data validation library. FastAPI uses it to validate request data and serialize responses based on Python type hints."
+  },
+  {
+    "question": "What is Starlette and how does it relate to FastAPI?",
+    "reference": "Starlette is an async web framework that FastAPI is built on top of. FastAPI adds data validation, serialization, and automatic documentation on top of Starlette."
+  },
+  {
+    "question": "How do you set up a virtual environment for a FastAPI project?",
+    "reference": "You create a virtual environment using python -m venv .venv, activate it, and then install FastAPI using pip install fastapi."
+  },
+  {
+    "question": "What environment variables are relevant to FastAPI?",
+    "reference": "Environment variables can be used to configure FastAPI applications, commonly for settings like API keys, database URLs, and other configuration values that should not be hardcoded."
+  },
+  {
+    "question": "What is OpenAPI and how does FastAPI use it?",
+    "reference": "OpenAPI is an open standard for describing APIs. FastAPI automatically generates an OpenAPI schema from your code, which powers the interactive documentation."
+  },
+  {
+    "question": "What is the history behind FastAPI?",
+    "reference": "FastAPI was created after its author evaluated existing frameworks and found none that combined automatic validation, serialization, and documentation with high performance, so it was built combining ideas from Flask, APIStar, and others."
+  },
+  {
+    "question": "What does the fastapi dev command do?",
+    "reference": "The fastapi dev command starts a local development server with auto-reload enabled, automatically detecting your FastAPI application in main.py."
+  }
+]
