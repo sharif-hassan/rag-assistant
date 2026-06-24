@@ -53,7 +53,9 @@ app.py                →   Streamlit web UI
 | Generation (default) | OpenAI `gpt-4o-mini` | Fast, cheap, strong instruction following |
 | Generation (local) | phi3:mini via Ollama | Fully offline, zero API cost, CPU-runnable |
 | Chunking | Boundary-aware (paragraph → sentence fallback) | Avoids cutting mid-sentence |
-| UI | Streamlit | Fast to ship, clean enough to demo |
+| UI | React + Vite | Clean, responsive frontend |
+| API | FastAPI | REST backend wrapping the RAG pipeline |
+| Query rewriting | GPT-4o-mini pre-retrieval | Improves semantic match between questions and docs |
 
 ---
 
@@ -73,12 +75,12 @@ Evaluated on 15 question/reference-answer pairs using an **LLM-as-judge** method
 
 | Backend | Avg Score | Median | Score ≥ 4 | Failures |
 |---|---|---|---|---|
-| OpenAI gpt-4o-mini | 4.27 / 5.00 | 4.0 | 13/15 (86%) | 1 |
-| Ollama phi3:mini | 4.53 / 5.00 | 5.0 | 15/15 (100%) | 0 |
+| OpenAI gpt-4o-mini | 4.73 / 5.00 | 5.0 | 14/15 (93%) | 0 |
+| Ollama phi3:mini | 4.47 / 5.00 | 5.0 | 14/15 (93%) | 0 |
 
 The local model achieved comparable answer quality to the cloud model while running fully offline with zero API cost, at the tradeoff of significantly higher latency on CPU-only hardware (~30–60s per response without a GPU).
 
-Known limitation: broad/vague queries (e.g. "What is FastAPI?") retrieve lower-quality chunks than specific technical questions, due to semantic mismatch between query phrasing and chunk content. Targeted technical questions score significantly higher.
+Query rewriting is applied before retrieval to close the semantic gap between conversational questions and documentation prose. This improved average eval score from 4.27 to 4.73 and eliminated all retrieval failures.
 
 ---
 
@@ -92,7 +94,14 @@ rag-assistant/
 │   ├── chunker.py            # Documents → overlapping Chunk objects
 │   ├── embedder.py           # Chunks → embeddings → ChromaDB
 │   ├── llm_client.py         # LLM abstraction (OpenAI or Ollama)
+│   ├── query_rewriter.py     # Pre-retrieval query rewriting
 │   └── pipeline.py           # Wires components into ask()
+├── api/
+│   └── main.py               # FastAPI REST backend
+├── frontend/
+│   └── src/
+│       ├── App.jsx           # React frontend
+│       └── App.css           # Styles
 ├── scripts/
 │   └── cli.py                # Interactive CLI
 ├── evaluation/
@@ -100,7 +109,7 @@ rag-assistant/
 │   └── evaluate.py           # LLM-as-judge evaluation script
 ├── data/
 │   └── raw/                  # Source markdown files
-├── app.py                    # Streamlit web UI
+├── app.py                    # Streamlit UI (Phase 3)
 ├── .env.example
 ├── requirements.txt
 └── README.md
@@ -130,11 +139,19 @@ cp .env.example .env
 # 3. Ingest documents into ChromaDB
 python -m rag.embedder
 
-# 4. Run the Streamlit UI
-streamlit run app.py
+# 4. Run the FastAPI backend
+uvicorn api.main:app --reload
+
+# 5. In a separate terminal, run the React frontend
+cd frontend
+npm install
+npm run dev
 
 # Or use the CLI
 python -m scripts.cli
+
+# Or use the Streamlit UI (simpler, no separate frontend needed)
+streamlit run app.py
 ```
 
 ### Switching to local/offline mode

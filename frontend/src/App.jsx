@@ -64,13 +64,13 @@ export default function App() {
           <div className="sidebar-label">Evaluation</div>
           <div className="eval-row">
             <span className="eval-backend">OpenAI</span>
-            <span className="eval-score">4.27 / 5.00</span>
-            <span className="eval-pct">86%</span>
+            <span className="eval-score">4.73 / 5.00</span>
+            <span className="eval-pct">93%</span>
           </div>
           <div className="eval-row">
             <span className="eval-backend">Ollama</span>
-            <span className="eval-score">4.53 / 5.00</span>
-            <span className="eval-pct">100%</span>
+            <span className="eval-score">4.47 / 5.00</span>
+            <span className="eval-pct">93%</span>
           </div>
         </div>
 
