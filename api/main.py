@@ -7,8 +7,8 @@ Three endpoints:
   GET  /corpus   — list documents currently ingested
 
 The RAG pipeline is instantiated once at startup and reused across
-requests. All retrieval and generation logic stays in pipeline.py —
-this file only handles HTTP concerns.
+requests. On first startup, the vector store is automatically populated
+from the corpus in data/raw/ if it's empty.
 """
 
 from contextlib import asynccontextmanager
@@ -22,6 +22,34 @@ from rag.config import DATA_RAW_DIR
 from rag.pipeline import RAGPipeline
 
 
+# ── Auto-ingestion ────────────────────────────────────────────────────────────
+def _ensure_corpus_ingested() -> None:
+    """Ingest documents if the vector store is empty.
+
+    Runs automatically on startup so the system works on first deploy
+    without a separate ingestion step.
+    """
+    import chromadb
+    from rag.config import CHROMA_PERSIST_DIR, CHROMA_COLLECTION_NAME
+
+    client = chromadb.PersistentClient(path=CHROMA_PERSIST_DIR)
+    collection = client.get_or_create_collection(CHROMA_COLLECTION_NAME)
+
+    if collection.count() == 0:
+        print("Vector store empty — running ingestion...")
+        from rag.document_loader import load_documents
+        from rag.chunker import chunk_documents
+        from rag.embedder import VectorStore
+
+        docs = load_documents()
+        chunks = chunk_documents(docs)
+        store = VectorStore()
+        store.add_chunks(chunks)
+        print(f"Ingested {len(chunks)} chunks.")
+    else:
+        print(f"Vector store ready ({collection.count()} chunks).")
+
+
 # ── Lifespan: instantiate pipeline once at startup ────────────────────────────
 pipeline: RAGPipeline | None = None
 
@@ -29,6 +57,7 @@ pipeline: RAGPipeline | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global pipeline
+    _ensure_corpus_ingested()
     pipeline = RAGPipeline()
     yield
     pipeline = None
