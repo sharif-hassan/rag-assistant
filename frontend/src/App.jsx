@@ -2,7 +2,7 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import "./App.css";
 
-const API_URL = "http://localhost:8000";
+const API_URL = "https://rag-assistant-production-005f.up.railway.app";
 
 const EXAMPLES = [
   "What is FastAPI?",
