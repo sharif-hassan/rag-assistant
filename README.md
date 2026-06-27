@@ -4,6 +4,8 @@ A modular Retrieval-Augmented Generation (RAG) system that answers questions gro
 
 ![FastAPI Docs Assistant UI](docs/screenshot.png)
 
+**[Live Demo →](https://rag-assistant-fawn.vercel.app)**
+
 ---
 
 ## What it does
